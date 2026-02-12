@@ -1,38 +1,19 @@
 'use server';
 
-import { createServerClient } from '@supabase/ssr';
-import { cookies } from 'next/headers';
+import { headers } from 'next/headers';
 import { revalidatePath } from 'next/cache';
 import { NoteSchema, CreateNoteInput, UpdateNoteInput } from '@/schemas/note';
 
-// Helper to get current user from session
-export async function getCurrentUser() {
-  const cookieStore = await cookies();
+// Helper to get current user from headers (set by middleware)
+async function getCurrentUser() {
+  const headersList = await headers();
+  const userId = headersList.get('x-user-id');
   
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        getAll() {
-          return cookieStore.getAll();
-        },
-        setAll(cookiesToSet) {
-          cookiesToSet.forEach(({ name, value, options }) => {
-            cookieStore.set(name, value, options);
-          });
-        },
-      },
-    }
-  );
-
-  const { data: { user }, error } = await supabase.auth.getUser();
-  
-  if (error || !user) {
+  if (!userId) {
     throw new Error('인증이 필요합니다.');
   }
 
-  return { id: user.id };
+  return { id: userId };
 }
 
 // Server-side Supabase client for DB operations
