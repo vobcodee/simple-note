@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { testAuthAction } from './test-action';
+import { testAuthAction } from '../notes/test-action';
 
 export default function TestAuthPage() {
   const [result, setResult] = useState<any>(null);
