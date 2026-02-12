@@ -1,14 +1,11 @@
-import { createServerClient } from '@supabase/ssr';
-import { cookies } from 'next/headers';
 import { NextRequest, NextResponse } from 'next/server';
 
-// TODO: Fix auth before production!
-const DEV_USER_ID = process.env.TEST_USER_ID || '00000000-0000-0000-0000-000000000000';
-
-// Helper to get user (currently returns hardcoded user for development)
-async function getUser() {
-  console.log('[WARNING] Using hardcoded user ID for development:', DEV_USER_ID);
-  return { id: DEV_USER_ID };
+// Helper to get user ID from header (for development)
+function getUserId(request: NextRequest): string {
+  const userId = request.headers.get('x-dev-user-id');
+  if (userId) return userId;
+  
+  return process.env.TEST_USER_ID || '00000000-0000-0000-0000-000000000000';
 }
 
 // GET /api/notes/[id] - Get a single note
@@ -17,7 +14,7 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params;
-  const user = await getUser();
+  const userId = getUserId(request);
 
   const { createClient } = await import('@supabase/supabase-js');
   const supabase = createClient(
@@ -29,7 +26,7 @@ export async function GET(
     .from('notes')
     .select('*')
     .eq('id', id)
-    .eq('user_id', user.id)
+    .eq('user_id', userId)
     .single();
 
   if (error) {
@@ -48,7 +45,7 @@ export async function PUT(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params;
-  const user = await getUser();
+  const userId = getUserId(request);
 
   const body = await request.json();
   const { title, content } = body;
@@ -63,7 +60,7 @@ export async function PUT(
     .from('notes')
     .update({ title, content, updated_at: new Date().toISOString() })
     .eq('id', id)
-    .eq('user_id', user.id)
+    .eq('user_id', userId)
     .select()
     .single();
 
@@ -80,7 +77,7 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params;
-  const user = await getUser();
+  const userId = getUserId(request);
 
   const { createClient } = await import('@supabase/supabase-js');
   const supabase = createClient(
@@ -92,7 +89,7 @@ export async function DELETE(
     .from('notes')
     .delete()
     .eq('id', id)
-    .eq('user_id', user.id);
+    .eq('user_id', userId);
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });

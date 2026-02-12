@@ -13,16 +13,20 @@ export default function NewNotePage() {
     setSubmitting(true);
     
     try {
+      const userId = localStorage.getItem('dev_user_id');
+      
+      const headers: HeadersInit = {
+        'Content-Type': 'application/json',
+      };
+      if (userId) {
+        headers['x-dev-user-id'] = userId;
+      }
+      
       const res = await fetch('/api/notes', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         body: JSON.stringify({ title, content }),
       });
-
-      if (res.status === 401) {
-        window.location.href = '/login';
-        return;
-      }
 
       if (!res.ok) {
         const { error } = await res.json();

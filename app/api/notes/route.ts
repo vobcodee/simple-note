@@ -1,22 +1,17 @@
-import { createServerClient } from '@supabase/ssr';
-import { cookies } from 'next/headers';
 import { NextRequest, NextResponse } from 'next/server';
 
-// TODO: Fix auth before production!
-// Currently using hardcoded user ID for development
-const DEV_USER_ID = process.env.TEST_USER_ID || '00000000-0000-0000-0000-000000000000';
-
-// Helper to get user (currently returns hardcoded user for development)
-async function getUser() {
-  // TEMPORARY: Skip auth check for development
-  // In production, use: const { data: { user } } = await supabase.auth.getUser();
-  console.log('[WARNING] Using hardcoded user ID for development:', DEV_USER_ID);
-  return { id: DEV_USER_ID };
+// Helper to get user ID from header (for development)
+function getUserId(request: NextRequest): string {
+  const userId = request.headers.get('x-dev-user-id');
+  if (userId) return userId;
+  
+  // Fallback to env or default
+  return process.env.TEST_USER_ID || '00000000-0000-0000-0000-000000000000';
 }
 
 // GET /api/notes - List all notes
 export async function GET(request: NextRequest) {
-  const user = await getUser();
+  const userId = getUserId(request);
   
   const { createClient } = await import('@supabase/supabase-js');
   const supabase = createClient(
@@ -27,7 +22,7 @@ export async function GET(request: NextRequest) {
   const { data, error } = await supabase
     .from('notes')
     .select('*')
-    .eq('user_id', user.id)
+    .eq('user_id', userId)
     .order('created_at', { ascending: false });
 
   if (error) {
@@ -39,7 +34,7 @@ export async function GET(request: NextRequest) {
 
 // POST /api/notes - Create a note
 export async function POST(request: NextRequest) {
-  const user = await getUser();
+  const userId = getUserId(request);
   
   const body = await request.json();
   const { title, content } = body;
@@ -56,7 +51,7 @@ export async function POST(request: NextRequest) {
 
   const { data, error } = await supabase
     .from('notes')
-    .insert({ title, content, user_id: user.id })
+    .insert({ title, content, user_id: userId })
     .select()
     .single();
 

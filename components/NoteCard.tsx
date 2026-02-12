@@ -23,14 +23,17 @@ export function NoteCard({ id, title, content, createdAt }: NoteCardProps) {
     
     setIsDeleting(true);
     try {
+      const userId = localStorage.getItem('dev_user_id');
+      
+      const headers: HeadersInit = {};
+      if (userId) {
+        headers['x-dev-user-id'] = userId;
+      }
+      
       const res = await fetch(`/api/notes/${id}`, {
         method: 'DELETE',
+        headers,
       });
-
-      if (res.status === 401) {
-        window.location.href = '/login';
-        return;
-      }
 
       if (!res.ok) {
         throw new Error('Failed to delete note');

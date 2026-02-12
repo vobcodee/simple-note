@@ -16,12 +16,14 @@ export default function EditNotePage() {
   useEffect(() => {
     async function fetchNote() {
       try {
-        const res = await fetch(`/api/notes/${id}`);
+        const userId = localStorage.getItem('dev_user_id');
         
-        if (res.status === 401) {
-          window.location.href = '/login';
-          return;
+        const headers: HeadersInit = {};
+        if (userId) {
+          headers['x-dev-user-id'] = userId;
         }
+        
+        const res = await fetch(`/api/notes/${id}`, { headers });
         
         if (!res.ok) {
           toast.error('노트를 찾을 수 없습니다.');
@@ -43,16 +45,20 @@ export default function EditNotePage() {
 
   const handleSubmit = async (title: string, content: string) => {
     try {
+      const userId = localStorage.getItem('dev_user_id');
+      
+      const headers: HeadersInit = {
+        'Content-Type': 'application/json',
+      };
+      if (userId) {
+        headers['x-dev-user-id'] = userId;
+      }
+      
       const res = await fetch(`/api/notes/${id}`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         body: JSON.stringify({ title, content }),
       });
-
-      if (res.status === 401) {
-        window.location.href = '/login';
-        return;
-      }
 
       if (!res.ok) {
         const { error } = await res.json();
