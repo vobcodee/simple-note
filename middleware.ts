@@ -6,7 +6,7 @@ console.log('[MIDDLEWARE] Module loaded');
 export async function middleware(request: NextRequest) {
   console.log('[MIDDLEWARE] Request:', request.url);
   
-  let supabaseResponse = NextResponse.next({
+  let response = NextResponse.next({
     request,
   });
 
@@ -19,39 +19,36 @@ export async function middleware(request: NextRequest) {
           return request.cookies.getAll();
         },
         setAll(cookiesToSet) {
-          cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value));
-          supabaseResponse = NextResponse.next({
-            request,
+          cookiesToSet.forEach(({ name, value, options }) => {
+            request.cookies.set(name, value);
+            response.cookies.set(name, value, options);
           });
-          cookiesToSet.forEach(({ name, value, options }) =>
-            supabaseResponse.cookies.set(name, value, options)
-          );
         },
       },
     }
   );
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  // IMPORTANT: First call getSession() to set auth cookie
+  const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+  console.log('[MIDDLEWARE] Session:', session?.user?.id || 'null', 'Error:', sessionError?.message || 'none');
 
-  console.log('[MIDDLEWARE] User:', user?.id || 'null');
+  // Then call getUser()
+  const { data: { user }, error: userError } = await supabase.auth.getUser();
+  console.log('[MIDDLEWARE] User:', user?.id || 'null', 'Error:', userError?.message || 'none');
 
   // Protected routes - redirect to login if not authenticated
   if (request.nextUrl.pathname.startsWith('/notes') && !user) {
     console.log('[MIDDLEWARE] Redirecting to login');
-    const redirectUrl = new URL('/login', request.url);
-    return NextResponse.redirect(redirectUrl);
+    return NextResponse.redirect(new URL('/login', request.url));
   }
 
   if (request.nextUrl.pathname === '/login' && user) {
     console.log('[MIDDLEWARE] Redirecting to notes');
-    const redirectUrl = new URL('/notes', request.url);
-    return NextResponse.redirect(redirectUrl);
+    return NextResponse.redirect(new URL('/notes', request.url));
   }
 
   console.log('[MIDDLEWARE] Proceeding');
-  return supabaseResponse;
+  return response;
 }
 
 export const config = {
