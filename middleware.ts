@@ -32,6 +32,11 @@ export async function middleware(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser();
 
+  // Add user ID to headers for server actions
+  if (user) {
+    supabaseResponse.headers.set('x-user-id', user.id);
+  }
+
   // Protected routes - redirect to login if not authenticated
   if (request.nextUrl.pathname.startsWith('/notes') && !user) {
     const redirectUrl = new URL('/login', request.url);
