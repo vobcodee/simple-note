@@ -6,7 +6,14 @@ import { useRouter } from 'next/navigation';
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+  {
+    auth: {
+      flowType: 'pkce',
+      autoRefreshToken: true,
+      persistSession: true,
+    },
+  }
 );
 
 export default function AuthCallbackPage() {
@@ -15,21 +22,37 @@ export default function AuthCallbackPage() {
 
   useEffect(() => {
     const processAuth = async () => {
-      // Check for hash-based auth (Magic Link)
+      console.log('[CALLBACK] Starting auth process');
+
+      // Wait a bit for cookies to be set
+      await new Promise(resolve => setTimeout(resolve, 500));
+
+      // Check if we have a session
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+      
+      console.log('[CALLBACK] Session check:', { 
+        hasSession: !!session, 
+        error: sessionError?.message 
+      });
+
+      if (session) {
+        console.log('[CALLBACK] Session found, user:', session.user.email);
+        setStatus('로그인 성공! 이동 중...');
+        window.location.href = '/notes';
+        return;
+      }
+
+      // If no session, check for hash-based auth (fallback)
       const hash = window.location.hash;
-      console.log('[CALLBACK PAGE] Hash:', hash);
+      console.log('[CALLBACK] Hash:', hash);
 
       if (hash && hash.includes('access_token')) {
-        console.log('[CALLBACK PAGE] Processing hash-based auth');
+        console.log('[CALLBACK] Processing hash-based auth');
         
         try {
           const params = new URLSearchParams(hash.substring(1));
           const accessToken = params.get('access_token');
           const refreshToken = params.get('refresh_token');
-
-          console.log('[CALLBACK PAGE] Tokens:', { 
-            hasAccessToken: !!accessToken 
-          });
 
           if (accessToken) {
             const { data, error } = await supabase.auth.setSession({
@@ -38,59 +61,70 @@ export default function AuthCallbackPage() {
             });
 
             if (error) {
-              console.error('[CALLBACK PAGE] setSession error:', error);
+              console.error('[CALLBACK] setSession error:', error);
               setStatus('로그인 실패: ' + error.message);
               setTimeout(() => router.push('/login?error=session'), 2000);
               return;
             }
 
-            console.log('[CALLBACK PAGE] Success, user:', data.user?.email);
+            console.log('[CALLBACK] Session set, user:', data.user?.email);
             setStatus('로그인 성공! 이동 중...');
-            
-            // Force full page reload to ensure cookies are set
             window.location.href = '/notes';
             return;
           }
         } catch (e) {
-          console.error('[CALLBACK PAGE] Error:', e);
-          setStatus('로그인 처리 중 오류');
-          setTimeout(() => router.push('/login?error=unknown'), 2000);
-          return;
+          console.error('[CALLBACK] Hash processing error:', e);
         }
       }
 
-      // Check for query-based auth (if Supabase uses code)
+      // Check for query params (code-based auth)
       const searchParams = new URLSearchParams(window.location.search);
       const code = searchParams.get('code');
 
       if (code) {
-        console.log('[CALLBACK PAGE] Processing code-based auth');
+        console.log('[CALLBACK] Processing code-based auth');
         
         try {
           const { error } = await supabase.auth.exchangeCodeForSession(code);
           
           if (error) {
-            console.error('[CALLBACK PAGE] exchangeCodeForSession error:', error);
+            console.error('[CALLBACK] exchangeCodeForSession error:', error);
             setStatus('로그인 실패: ' + error.message);
             setTimeout(() => router.push('/login?error=exchange'), 2000);
             return;
           }
 
-          console.log('[CALLBACK PAGE] Code exchange success');
+          console.log('[CALLBACK] Code exchange success');
           setStatus('로그인 성공! 이동 중...');
           window.location.href = '/notes';
           return;
         } catch (e) {
-          console.error('[CALLBACK PAGE] Code exchange error:', e);
-          setStatus('로그인 처리 중 오류');
-          setTimeout(() => router.push('/login?error=exception'), 2000);
-          return;
+          console.error('[CALLBACK] Code exchange error:', e);
         }
       }
 
-      console.log('[CALLBACK PAGE] No auth tokens found');
-      setStatus('인증 정보가 없습니다.');
-      setTimeout(() => router.push('/login?error=no_token'), 2000);
+      // Listen for auth state changes
+      console.log('[CALLBACK] Setting up auth state listener');
+      const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+        console.log('[CALLBACK] Auth state changed:', event, session?.user?.email);
+        
+        if (event === 'SIGNED_IN' && session) {
+          setStatus('로그인 성공! 이동 중...');
+          window.location.href = '/notes';
+        }
+      });
+
+      // Timeout after 5 seconds
+      setTimeout(() => {
+        console.log('[CALLBACK] Timeout - no auth detected');
+        setStatus('인증 정보를 찾을 수 없습니다.');
+        subscription.unsubscribe();
+        setTimeout(() => router.push('/login?error=no_auth'), 2000);
+      }, 5000);
+
+      return () => {
+        subscription.unsubscribe();
+      };
     };
 
     processAuth();
