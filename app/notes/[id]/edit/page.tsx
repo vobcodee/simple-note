@@ -3,8 +3,9 @@
 import { useEffect, useState } from "react";
 import { useRouter, useParams } from "next/navigation";
 import NoteForm from "@/components/NoteForm";
-import { getNote, updateNote } from "@/lib/db/notes";
-import { Note } from "@/types/note";
+import { getNoteAction, updateNoteAction } from "../actions";
+import { Note } from "@/schemas/note";
+import { toast } from "sonner";
 
 export default function EditNotePage() {
   const router = useRouter();
@@ -17,16 +18,16 @@ export default function EditNotePage() {
   useEffect(() => {
     async function fetchNote() {
       try {
-        const data = await getNote(id);
-        if (!data) {
-          alert("노트를 찾을 수 없습니다.");
+        const result = await getNoteAction(id);
+        if (!result.data) {
+          toast.error("노트를 찾을 수 없습니다.");
           router.push("/notes");
           return;
         }
-        setNote(data);
+        setNote(result.data);
       } catch (error) {
         console.error(error);
-        alert("데이터를 불러오는 중 오류가 발생했습니다.");
+        toast.error("데이터를 불러오는 중 오류가 발생했습니다.");
       } finally {
         setLoading(false);
       }
@@ -35,9 +36,18 @@ export default function EditNotePage() {
   }, [id, router]);
 
   const handleSubmit = async (title: string, content: string) => {
-    await updateNote(id, title, content);
-    router.push("/notes");
-    router.refresh();
+    try {
+      const result = await updateNoteAction(id, { title, content });
+      
+      if (result.success) {
+        toast.success("노트가 수정되었습니다!");
+        router.push("/notes");
+      }
+    } catch (error) {
+      console.error("Failed to update note:", error);
+      toast.error("노트 수정 중 오류가 발생했습니다.");
+      throw error;
+    }
   };
 
   if (loading) return <div className="p-10 text-center">로딩 중...</div>;
