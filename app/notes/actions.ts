@@ -1,5 +1,7 @@
 'use server';
 
+console.log('[SERVER] actions.ts module loaded');
+
 import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
 import { revalidatePath } from 'next/cache';
@@ -115,9 +117,10 @@ export async function createNoteAction(input: CreateNoteInput) {
 
 // READ (all notes for current user)
 export async function getNotesAction() {
-  console.log('[SERVER] getNotesAction called');
+  console.log('[SERVER] getNotesAction called - ENTRY');
   
   try {
+    console.log('[SERVER] Calling getCurrentUser...');
     const user = await getCurrentUser();
     console.log('[SERVER] User authenticated:', user.id);
     
