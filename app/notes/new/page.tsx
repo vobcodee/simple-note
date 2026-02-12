@@ -9,15 +9,19 @@ export default function NewNotePage() {
   const router = useRouter();
 
   const handleSubmit = async (title: string, content: string) => {
+    console.log("[CLIENT] handleSubmit called", { title, content });
+    
     try {
+      console.log("[CLIENT] Calling createNoteAction...");
       const result = await createNoteAction({ title, content });
+      console.log("[CLIENT] createNoteAction result:", result);
       
       if (result.success) {
         toast.success("노트가 생성되었습니다!");
         router.push("/notes");
       }
     } catch (error) {
-      console.error("Failed to create note:", error);
+      console.error("[CLIENT] Failed to create note:", error);
       toast.error("노트 생성 중 오류가 발생했습니다.");
       throw error;
     }
