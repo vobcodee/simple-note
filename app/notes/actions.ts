@@ -15,9 +15,9 @@ async function getCurrentUser() {
     console.log('[DEBUG] Cookies count:', allCookies.length);
     console.log('[DEBUG] Cookie names:', allCookies.map(c => c.name));
     
-    // Find the auth token cookie (supabase-auth-token)
-    const authCookie = allCookies.find(c => c.name.includes('auth'));
-    console.log('[DEBUG] Auth cookie found:', !!authCookie);
+    // Find the auth token cookie (sb-*-auth-token pattern)
+    const authCookie = allCookies.find(c => c.name.startsWith('sb-') && c.name.endsWith('-auth-token'));
+    console.log('[DEBUG] Auth cookie found:', authCookie?.name || 'none');
     
     const supabase = createServerClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
