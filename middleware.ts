@@ -5,9 +5,23 @@ console.log('[MIDDLEWARE] Module loaded');
 // Parse Supabase auth token from cookie
 function parseAuthToken(cookieValue: string): { access_token: string; refresh_token?: string } | null {
   try {
-    // Supabase stores auth as base64 encoded JSON array
-    const decoded = atob(cookieValue);
+    console.log('[MIDDLEWARE] Raw cookie length:', cookieValue.length);
+    console.log('[MIDDLEWARE] Raw cookie preview:', cookieValue.substring(0, 50));
+    
+    // Try to decode base64
+    let decoded: string;
+    try {
+      decoded = atob(cookieValue);
+    } catch (e) {
+      console.log('[MIDDLEWARE] atob failed, trying Buffer');
+      // For Node.js environment
+      decoded = Buffer.from(cookieValue, 'base64').toString('utf-8');
+    }
+    
+    console.log('[MIDDLEWARE] Decoded:', decoded.substring(0, 100));
+    
     const parsed = JSON.parse(decoded);
+    console.log('[MIDDLEWARE] Parsed type:', typeof parsed, 'isArray:', Array.isArray(parsed));
     
     if (Array.isArray(parsed) && parsed.length >= 1) {
       return {
@@ -27,7 +41,7 @@ export async function middleware(request: NextRequest) {
   
   // Find auth cookie
   const cookies = request.cookies.getAll();
-  console.log('[MIDDLEWARE] Cookies:', cookies.map(c => c.name));
+  console.log('[MIDDLEWARE] All cookies:', cookies.map(c => c.name));
   
   const authCookie = cookies.find(c => 
     c.name.startsWith('sb-') && c.name.endsWith('-auth-token')
@@ -45,14 +59,16 @@ export async function middleware(request: NextRequest) {
       hasRefresh: !!tokens?.refresh_token 
     });
     
-    // For now, just check if we have tokens (proper verification would require Supabase client)
     if (tokens?.access_token) {
       isAuthenticated = true;
-      // Decode JWT to get user ID (simple approach)
+      // Decode JWT to get user ID
       try {
         const base64Payload = tokens.access_token.split('.')[1];
-        const payload = JSON.parse(atob(base64Payload));
+        // Add padding if needed
+        const padding = '='.repeat((4 - base64Payload.length % 4) % 4);
+        const payload = JSON.parse(atob(base64Payload + padding));
         userId = payload.sub || null;
+        console.log('[MIDDLEWARE] Decoded userId from token:', userId);
       } catch (e) {
         console.error('[MIDDLEWARE] Failed to decode token:', e);
       }
