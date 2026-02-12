@@ -5,13 +5,7 @@ import { cookies } from 'next/headers';
 import { revalidatePath } from 'next/cache';
 import { NoteSchema, CreateNoteInput, UpdateNoteInput } from '@/schemas/note';
 
-// Simple test action
-export async function testAction() {
-  console.log('[SERVER] testAction called');
-  return { success: true, message: 'Server action is working' };
-}
-
-// Helper to get current user from session
+// Helper to get current user from session using SSR
 async function getCurrentUser() {
   console.log('[DEBUG] getCurrentUser called');
   
@@ -20,6 +14,10 @@ async function getCurrentUser() {
     const allCookies = cookieStore.getAll();
     console.log('[DEBUG] Cookies count:', allCookies.length);
     console.log('[DEBUG] Cookie names:', allCookies.map(c => c.name));
+    
+    // Find the auth token cookie (supabase-auth-token)
+    const authCookie = allCookies.find(c => c.name.includes('auth'));
+    console.log('[DEBUG] Auth cookie found:', !!authCookie);
     
     const supabase = createServerClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -64,7 +62,7 @@ async function getCurrentUser() {
   }
 }
 
-// Server-side Supabase client for DB operations
+// Server-side Supabase client for DB operations with service role
 async function getServiceClient() {
   const { createClient } = await import('@supabase/supabase-js');
   
@@ -117,11 +115,11 @@ export async function createNoteAction(input: CreateNoteInput) {
 
 // READ (all notes for current user)
 export async function getNotesAction() {
-  console.log('[DEBUG] getNotesAction called');
+  console.log('[SERVER] getNotesAction called');
   
   try {
     const user = await getCurrentUser();
-    console.log('[DEBUG] User authenticated:', user.id);
+    console.log('[SERVER] User authenticated:', user.id);
     
     const supabase = await getServiceClient();
     
@@ -132,24 +130,24 @@ export async function getNotesAction() {
       .order('created_at', { ascending: false });
 
     if (error) {
-      console.error('[DEBUG] DB error:', error);
+      console.error('[SERVER] DB error:', error);
       throw new Error(`노트 목록 조회 실패: ${error.message}`);
     }
 
     return { success: true, data: data || [] };
   } catch (error) {
-    console.error('[DEBUG] getNotesAction error:', error);
+    console.error('[SERVER] getNotesAction error:', error);
     throw error;
   }
 }
 
 // READ (single note)
 export async function getNoteAction(id: string) {
-  console.log('[DEBUG] getNoteAction called, id:', id);
+  console.log('[SERVER] getNoteAction called, id:', id);
   
   try {
     const user = await getCurrentUser();
-    console.log('[DEBUG] User authenticated:', user.id);
+    console.log('[SERVER] User authenticated:', user.id);
     
     const supabase = await getServiceClient();
     
@@ -162,24 +160,24 @@ export async function getNoteAction(id: string) {
 
     if (error) {
       if (error.code === 'PGRST116') return { success: true, data: null };
-      console.error('[DEBUG] DB error:', error);
+      console.error('[SERVER] DB error:', error);
       throw new Error(`노트 조회 실패: ${error.message}`);
     }
 
     return { success: true, data };
   } catch (error) {
-    console.error('[DEBUG] getNoteAction error:', error);
+    console.error('[SERVER] getNoteAction error:', error);
     throw error;
   }
 }
 
 // UPDATE
 export async function updateNoteAction(id: string, input: UpdateNoteInput) {
-  console.log('[DEBUG] updateNoteAction called, id:', id);
+  console.log('[SERVER] updateNoteAction called, id:', id);
   
   try {
     const user = await getCurrentUser();
-    console.log('[DEBUG] User authenticated:', user.id);
+    console.log('[SERVER] User authenticated:', user.id);
     
     const supabase = await getServiceClient();
     
@@ -198,7 +196,7 @@ export async function updateNoteAction(id: string, input: UpdateNoteInput) {
       .single();
 
     if (error) {
-      console.error('[DEBUG] DB error:', error);
+      console.error('[SERVER] DB error:', error);
       throw new Error(`노트 수정 실패: ${error.message}`);
     }
 
@@ -206,18 +204,18 @@ export async function updateNoteAction(id: string, input: UpdateNoteInput) {
     revalidatePath(`/notes/${id}/edit`);
     return { success: true, data };
   } catch (error) {
-    console.error('[DEBUG] updateNoteAction error:', error);
+    console.error('[SERVER] updateNoteAction error:', error);
     throw error;
   }
 }
 
 // DELETE
 export async function deleteNoteAction(id: string) {
-  console.log('[DEBUG] deleteNoteAction called, id:', id);
+  console.log('[SERVER] deleteNoteAction called, id:', id);
   
   try {
     const user = await getCurrentUser();
-    console.log('[DEBUG] User authenticated:', user.id);
+    console.log('[SERVER] User authenticated:', user.id);
     
     const supabase = await getServiceClient();
     
@@ -228,14 +226,14 @@ export async function deleteNoteAction(id: string) {
       .eq('user_id', user.id);
 
     if (error) {
-      console.error('[DEBUG] DB error:', error);
+      console.error('[SERVER] DB error:', error);
       throw new Error(`노트 삭제 실패: ${error.message}`);
     }
 
     revalidatePath('/notes');
     return { success: true };
   } catch (error) {
-    console.error('[DEBUG] deleteNoteAction error:', error);
+    console.error('[SERVER] deleteNoteAction error:', error);
     throw error;
   }
 }
