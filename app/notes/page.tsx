@@ -1,11 +1,11 @@
 import { NoteCard } from "@/components/NoteCard";
-import { getNotes } from "@/lib/db/notes";
+import { getNotesAction } from "./actions";
 import Link from "next/link";
 
 export const revalidate = 0;
 
 export default async function NotesPage() {
-  const notes = await getNotes();
+  const { data: notes } = await getNotesAction();
 
   return (
     <main className="max-w-4xl mx-auto p-4">
@@ -22,7 +22,7 @@ export default async function NotesPage() {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {notes.length === 0 ? (
           <div className="col-span-full text-center py-20 bg-neutral-50 rounded-xl border border-dashed border-neutral-300">
-            <p className="text-neutral-500">작성된 노트가 없습니다. 첫 노트를 작성해보세요!</p>
+            <p className="text-neutral-500">작성된 노트가 없습니다. 첫 노트를 작성필보세요!</p>
           </div>
         ) : (
           notes.map((n) => (

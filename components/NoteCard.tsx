@@ -1,9 +1,10 @@
 "use client";
 
-import { deleteNote } from "@/lib/db/notes";
+import { deleteNoteAction } from "@/app/notes/actions";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import Link from "next/link";
+import { toast } from "sonner";
 
 type NoteCardProps = {
   id: string;
@@ -23,11 +24,12 @@ export function NoteCard({ id, title, content, createdAt }: NoteCardProps) {
     
     setIsDeleting(true);
     try {
-      await deleteNote(id);
+      await deleteNoteAction(id);
+      toast.success("노트가 삭제되었습니다.");
       router.refresh();
     } catch (error) {
       console.error("Delete error:", error);
-      alert("삭제 중 오류가 발생했습니다.");
+      toast.error("삭제 중 오류가 발생했습니다.");
     } finally {
       setIsDeleting(false);
     }
