@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { createClient } from '@supabase/supabase-js';
 import { toast } from 'sonner';
 
@@ -13,6 +13,65 @@ export default function LoginPage() {
   const [email, setEmail] = useState('');
   const [loading, setLoading] = useState(false);
   const [sent, setSent] = useState(false);
+  const [processingHash, setProcessingHash] = useState(true);
+
+  // Handle hash-based auth (for Magic Link)
+  useEffect(() => {
+    const handleHashAuth = async () => {
+      const hash = window.location.hash;
+      console.log('[LOGIN] Hash:', hash);
+
+      if (hash && hash.includes('access_token')) {
+        console.log('[LOGIN] Detected hash-based auth');
+        
+        try {
+          // Extract tokens from hash
+          const params = new URLSearchParams(hash.substring(1));
+          const accessToken = params.get('access_token');
+          const refreshToken = params.get('refresh_token');
+          const expiresIn = params.get('expires_in');
+
+          console.log('[LOGIN] Tokens:', { 
+            hasAccessToken: !!accessToken, 
+            hasRefreshToken: !!refreshToken 
+          });
+
+          if (accessToken) {
+            // Set the session
+            const { data, error } = await supabase.auth.setSession({
+              access_token: accessToken,
+              refresh_token: refreshToken || '',
+            });
+
+            if (error) {
+              console.error('[LOGIN] setSession error:', error);
+              toast.error('로그인 처리 중 오류: ' + error.message);
+              setProcessingHash(false);
+              return;
+            }
+
+            console.log('[LOGIN] Session set, user:', data.user?.email);
+            
+            // Clear hash from URL
+            window.history.replaceState({}, document.title, window.location.pathname);
+            
+            toast.success('로그인되었습니다!');
+            
+            // Redirect to notes
+            window.location.href = '/notes';
+            return;
+          }
+        } catch (e) {
+          console.error('[LOGIN] Hash processing error:', e);
+          toast.error('로그인 처리 중 오류가 발생했습니다.');
+        }
+      }
+
+      setProcessingHash(false);
+    };
+
+    handleHashAuth();
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -21,7 +80,7 @@ export default function LoginPage() {
     const { error } = await supabase.auth.signInWithOtp({
       email,
       options: {
-        emailRedirectTo: `${window.location.origin}/auth/callback`,
+        emailRedirectTo: `${window.location.origin}/login`,
       },
     });
 
@@ -34,6 +93,14 @@ export default function LoginPage() {
 
     setLoading(false);
   };
+
+  if (processingHash) {
+    return (
+      <main className="max-w-md mx-auto p-8 text-center">
+        <p className="text-neutral-600">로그인 처리 중...</p>
+      </main>
+    );
+  }
 
   if (sent) {
     return (
