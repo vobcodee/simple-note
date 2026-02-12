@@ -2,69 +2,27 @@
 
 console.log('[SERVER] actions.ts module loaded');
 
-import { createServerClient } from '@supabase/ssr';
-import { cookies } from 'next/headers';
+import { headers } from 'next/headers';
 import { revalidatePath } from 'next/cache';
 import { NoteSchema, CreateNoteInput, UpdateNoteInput } from '@/schemas/note';
 
-// Helper to get current user from session using SSR
+// Helper to get current user from headers (set by middleware)
 async function getCurrentUser() {
   console.log('[DEBUG] getCurrentUser called');
   
-  try {
-    const cookieStore = await cookies();
-    const allCookies = cookieStore.getAll();
-    console.log('[DEBUG] Cookies count:', allCookies.length);
-    console.log('[DEBUG] Cookie names:', allCookies.map(c => c.name));
-    
-    // Find the auth token cookie (sb-*-auth-token pattern)
-    const authCookie = allCookies.find(c => c.name.startsWith('sb-') && c.name.endsWith('-auth-token'));
-    console.log('[DEBUG] Auth cookie found:', authCookie?.name || 'none');
-    
-    const supabase = createServerClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-      {
-        cookies: {
-          getAll() {
-            return allCookies;
-          },
-          setAll(cookiesToSet) {
-            cookiesToSet.forEach(({ name, value, options }) => {
-              cookieStore.set(name, value, options);
-            });
-          },
-        },
-      }
-    );
-
-    console.log('[DEBUG] Supabase client created');
-    
-    const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-    console.log('[DEBUG] Session:', session?.user?.id || 'null', 'Error:', sessionError?.message || 'none');
-    
-    const { data: { user }, error } = await supabase.auth.getUser();
-    
-    console.log('[DEBUG] getUser result:', { user: user?.id, error: error?.message });
-    
-    if (error) {
-      console.error('[DEBUG] Auth error:', error);
-      throw new Error('인증이 필요합니다. (Error: ' + error.message + ')');
-    }
-    
-    if (!user) {
-      console.error('[DEBUG] No user found');
-      throw new Error('인증이 필요합니다. (No user)');
-    }
-
-    return { id: user.id };
-  } catch (e) {
-    console.error('[DEBUG] getCurrentUser exception:', e);
-    throw e;
+  const headersList = await headers();
+  const userId = headersList.get('x-user-id');
+  
+  console.log('[DEBUG] x-user-id from headers:', userId);
+  
+  if (!userId) {
+    throw new Error('인증이 필요합니다.');
   }
+
+  return { id: userId };
 }
 
-// Server-side Supabase client for DB operations with service role
+// Server-side Supabase client for DB operations
 async function getServiceClient() {
   const { createClient } = await import('@supabase/supabase-js');
   
