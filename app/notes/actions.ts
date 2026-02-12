@@ -2,24 +2,56 @@
 
 console.log('[SERVER] actions.ts module loaded');
 
-import { headers } from 'next/headers';
+import { createServerClient } from '@supabase/ssr';
+import { cookies } from 'next/headers';
 import { revalidatePath } from 'next/cache';
 import { NoteSchema, CreateNoteInput, UpdateNoteInput } from '@/schemas/note';
 
-// Helper to get current user from headers (set by middleware)
+// Helper to get current user from session
 async function getCurrentUser() {
   console.log('[DEBUG] getCurrentUser called');
   
-  const headersList = await headers();
-  const userId = headersList.get('x-user-id');
-  
-  console.log('[DEBUG] x-user-id from headers:', userId);
-  
-  if (!userId) {
+  try {
+    const cookieStore = await cookies();
+    
+    const supabase = createServerClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+      {
+        cookies: {
+          getAll() {
+            return cookieStore.getAll();
+          },
+          setAll(cookiesToSet) {
+            cookiesToSet.forEach(({ name, value, options }) => {
+              cookieStore.set(name, value, options);
+            });
+          },
+        },
+      }
+    );
+
+    // Try to get session
+    const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+    console.log('[DEBUG] Session:', session?.user?.id || 'null', 'Error:', sessionError?.message || 'none');
+    
+    if (session?.user) {
+      return { id: session.user.id };
+    }
+    
+    // Fallback to getUser
+    const { data: { user }, error: userError } = await supabase.auth.getUser();
+    console.log('[DEBUG] User:', user?.id || 'null', 'Error:', userError?.message || 'none');
+    
+    if (user) {
+      return { id: user.id };
+    }
+    
+    throw new Error('인증이 필요합니다.');
+  } catch (e) {
+    console.error('[DEBUG] getCurrentUser error:', e);
     throw new Error('인증이 필요합니다.');
   }
-
-  return { id: userId };
 }
 
 // Server-side Supabase client for DB operations
