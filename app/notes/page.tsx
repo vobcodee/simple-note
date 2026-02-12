@@ -1,27 +1,44 @@
-console.log('[PAGE] notes/page.tsx module loading');
+'use client';
 
-import { NoteCard } from "@/components/NoteCard";
-import { getNotesAction } from "./actions";
-import Link from "next/link";
+import { useEffect, useState } from 'react';
+import { NoteCard } from '@/components/NoteCard';
+import Link from 'next/link';
 
-export const revalidate = 0;
+export default function NotesPage() {
+  const [notes, setNotes] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
 
-export default async function NotesPage() {
-  console.log('[PAGE] NotesPage component rendering');
-  
-  let notes: any[] = [];
-  
-  try {
-    console.log('[PAGE] Calling getNotesAction...');
-    const result = await getNotesAction();
-    console.log('[PAGE] getNotesAction result:', result);
-    notes = result.data;
-  } catch (e) {
-    console.error('[PAGE] Error:', e);
-    throw e;
+  useEffect(() => {
+    const fetchNotes = async () => {
+      try {
+        const res = await fetch('/api/notes');
+        if (res.status === 401) {
+          window.location.href = '/login';
+          return;
+        }
+        if (!res.ok) {
+          throw new Error('Failed to fetch notes');
+        }
+        const { data } = await res.json();
+        setNotes(data);
+      } catch (e) {
+        setError('노트를 불러오는 중 오류가 발생했습니다.');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchNotes();
+  }, []);
+
+  if (loading) {
+    return <div className="p-8 text-center">로딩 중...</div>;
   }
 
-  console.log('[PAGE] Rendering with', notes.length, 'notes');
+  if (error) {
+    return <div className="p-8 text-center text-red-500">{error}</div>;
+  }
 
   return (
     <main className="max-w-4xl mx-auto p-4">

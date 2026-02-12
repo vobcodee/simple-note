@@ -1,10 +1,9 @@
-"use client";
+'use client';
 
-import { deleteNoteAction } from "@/app/notes/actions";
-import { useRouter } from "next/navigation";
-import { useState } from "react";
-import Link from "next/link";
-import { toast } from "sonner";
+import { useRouter } from 'next/navigation';
+import { useState } from 'react';
+import Link from 'next/link';
+import { toast } from 'sonner';
 
 type NoteCardProps = {
   id: string;
@@ -24,7 +23,19 @@ export function NoteCard({ id, title, content, createdAt }: NoteCardProps) {
     
     setIsDeleting(true);
     try {
-      await deleteNoteAction(id);
+      const res = await fetch(`/api/notes/${id}`, {
+        method: 'DELETE',
+      });
+
+      if (res.status === 401) {
+        window.location.href = '/login';
+        return;
+      }
+
+      if (!res.ok) {
+        throw new Error('Failed to delete note');
+      }
+
       toast.success("노트가 삭제되었습니다.");
       router.refresh();
     } catch (error) {
