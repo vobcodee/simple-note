@@ -1,3 +1,5 @@
+console.log('[PAGE] notes/page.tsx module loading');
+
 import { NoteCard } from "@/components/NoteCard";
 import { getNotesAction } from "./actions";
 import Link from "next/link";
@@ -5,7 +7,21 @@ import Link from "next/link";
 export const revalidate = 0;
 
 export default async function NotesPage() {
-  const { data: notes } = await getNotesAction();
+  console.log('[PAGE] NotesPage component rendering');
+  
+  let notes: any[] = [];
+  
+  try {
+    console.log('[PAGE] Calling getNotesAction...');
+    const result = await getNotesAction();
+    console.log('[PAGE] getNotesAction result:', result);
+    notes = result.data;
+  } catch (e) {
+    console.error('[PAGE] Error:', e);
+    throw e;
+  }
+
+  console.log('[PAGE] Rendering with', notes.length, 'notes');
 
   return (
     <main className="max-w-4xl mx-auto p-4">

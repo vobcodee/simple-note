@@ -1,7 +1,11 @@
 import { createServerClient } from '@supabase/ssr';
 import { NextResponse, type NextRequest } from 'next/server';
 
+console.log('[MIDDLEWARE] Module loaded');
+
 export async function middleware(request: NextRequest) {
+  console.log('[MIDDLEWARE] Request:', request.url);
+  
   let supabaseResponse = NextResponse.next({
     request,
   });
@@ -27,40 +31,31 @@ export async function middleware(request: NextRequest) {
     }
   );
 
-  // Refresh session if expired
   const {
     data: { user },
   } = await supabase.auth.getUser();
 
-  // Add user ID to headers for server actions
-  if (user) {
-    supabaseResponse.headers.set('x-user-id', user.id);
-  }
+  console.log('[MIDDLEWARE] User:', user?.id || 'null');
 
   // Protected routes - redirect to login if not authenticated
   if (request.nextUrl.pathname.startsWith('/notes') && !user) {
+    console.log('[MIDDLEWARE] Redirecting to login');
     const redirectUrl = new URL('/login', request.url);
     return NextResponse.redirect(redirectUrl);
   }
 
-  // Redirect authenticated users away from login page
   if (request.nextUrl.pathname === '/login' && user) {
+    console.log('[MIDDLEWARE] Redirecting to notes');
     const redirectUrl = new URL('/notes', request.url);
     return NextResponse.redirect(redirectUrl);
   }
 
+  console.log('[MIDDLEWARE] Proceeding');
   return supabaseResponse;
 }
 
 export const config = {
   matcher: [
-    /*
-     * Match all request paths except for the ones starting with:
-     * - _next/static (static files)
-     * - _next/image (image optimization files)
-     * - favicon.ico (favicon file)
-     * - public folder
-     */
     '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
   ],
 };
