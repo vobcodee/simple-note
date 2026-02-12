@@ -1,37 +1,64 @@
 'use server';
 
-import { createClient } from '@supabase/supabase-js';
+import { createServerClient } from '@supabase/ssr';
+import { cookies } from 'next/headers';
 import { revalidatePath } from 'next/cache';
-import { redirect } from 'next/navigation';
 import { NoteSchema, CreateNoteInput, UpdateNoteInput } from '@/schemas/note';
 
-// Server-side Supabase client (uses service role key, not exposed to client)
-const supabase = createClient(
-  process.env.SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!,
-  {
-    auth: {
-      autoRefreshToken: false,
-      persistSession: false,
-    },
-  }
-);
+// Helper to get current user from session
+export async function getCurrentUser() {
+  const cookieStore = await cookies();
+  
+  const supabase = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        getAll() {
+          return cookieStore.getAll();
+        },
+        setAll(cookiesToSet) {
+          cookiesToSet.forEach(({ name, value, options }) => {
+            cookieStore.set(name, value, options);
+          });
+        },
+      },
+    }
+  );
 
-// Helper to get current user from session (to be implemented with Supabase Auth)
-async function getCurrentUser() {
-  // This will be implemented when we add authentication
-  // For now, return a mock user ID for testing
-  // TODO: Replace with actual auth.getUser() call
-  return { id: process.env.TEST_USER_ID || '00000000-0000-0000-0000-000000000000' };
+  const { data: { user }, error } = await supabase.auth.getUser();
+  
+  if (error || !user) {
+    throw new Error('인증이 필요합니다.');
+  }
+
+  return { id: user.id };
+}
+
+// Server-side Supabase client for DB operations
+async function getServiceClient() {
+  const { createClient } = await import('@supabase/supabase-js');
+  
+  return createClient(
+    process.env.SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+    {
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false,
+      },
+    }
+  );
 }
 
 // CREATE
 export async function createNoteAction(input: CreateNoteInput) {
   try {
-    // Validate input
-    const validated = NoteSchema.omit({ id: true, created_at: true, updated_at: true }).parse(input);
-    
     const user = await getCurrentUser();
+    const supabase = await getServiceClient();
+    
+    // Validate input
+    const validated = NoteSchema.omit({ id: true, created_at: true, updated_at: true, user_id: true }).parse(input);
     
     const { data, error } = await supabase
       .from('notes')
@@ -59,6 +86,7 @@ export async function createNoteAction(input: CreateNoteInput) {
 export async function getNotesAction() {
   try {
     const user = await getCurrentUser();
+    const supabase = await getServiceClient();
     
     const { data, error } = await supabase
       .from('notes')
@@ -82,6 +110,7 @@ export async function getNotesAction() {
 export async function getNoteAction(id: string) {
   try {
     const user = await getCurrentUser();
+    const supabase = await getServiceClient();
     
     const { data, error } = await supabase
       .from('notes')
@@ -106,10 +135,11 @@ export async function getNoteAction(id: string) {
 // UPDATE
 export async function updateNoteAction(id: string, input: UpdateNoteInput) {
   try {
-    // Validate input
-    const validated = NoteSchema.omit({ id: true, created_at: true, updated_at: true }).parse(input);
-    
     const user = await getCurrentUser();
+    const supabase = await getServiceClient();
+    
+    // Validate input
+    const validated = NoteSchema.omit({ id: true, created_at: true, updated_at: true, user_id: true }).parse(input);
     
     const { data, error } = await supabase
       .from('notes')
@@ -140,6 +170,7 @@ export async function updateNoteAction(id: string, input: UpdateNoteInput) {
 export async function deleteNoteAction(id: string) {
   try {
     const user = await getCurrentUser();
+    const supabase = await getServiceClient();
     
     const { error } = await supabase
       .from('notes')
