@@ -1,35 +1,35 @@
-import { createClient } from '@supabase/supabase-js';
+import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
 import { NextRequest, NextResponse } from 'next/server';
 
-// Helper to get authenticated user from cookie
+// Helper to get authenticated user using Supabase SSR
 async function getUser() {
   const cookieStore = await cookies();
-  const authCookie = cookieStore.getAll().find(c => 
-    c.name.startsWith('sb-') && c.name.endsWith('-auth-token')
+  
+  const supabase = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        getAll() {
+          return cookieStore.getAll();
+        },
+        setAll(cookiesToSet) {
+          cookiesToSet.forEach(({ name, value, options }) => {
+            cookieStore.set(name, value, options);
+          });
+        },
+      },
+    }
   );
 
-  if (!authCookie?.value) {
-    return null;
+  const { data: { user }, error } = await supabase.auth.getUser();
+  
+  if (error) {
+    console.error('[API] getUser error:', error.message);
   }
-
-  try {
-    const decoded = Buffer.from(authCookie.value, 'base64').toString('utf-8');
-    const parsed = JSON.parse(decoded);
-    
-    if (Array.isArray(parsed) && parsed.length >= 1) {
-      const accessToken = parsed[0];
-      const base64Payload = accessToken.split('.')[1];
-      const padding = '='.repeat((4 - base64Payload.length % 4) % 4);
-      const payload = JSON.parse(Buffer.from(base64Payload + padding, 'base64').toString('utf-8'));
-      
-      return { id: payload.sub };
-    }
-  } catch (e) {
-    console.error('Failed to parse auth:', e);
-  }
-
-  return null;
+  
+  return user;
 }
 
 // GET /api/notes/[id] - Get a single note
@@ -44,6 +44,7 @@ export async function GET(
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
+  const { createClient } = await import('@supabase/supabase-js');
   const supabase = createClient(
     process.env.SUPABASE_URL!,
     process.env.SUPABASE_SERVICE_ROLE_KEY!
@@ -81,6 +82,7 @@ export async function PUT(
   const body = await request.json();
   const { title, content } = body;
 
+  const { createClient } = await import('@supabase/supabase-js');
   const supabase = createClient(
     process.env.SUPABASE_URL!,
     process.env.SUPABASE_SERVICE_ROLE_KEY!
@@ -113,6 +115,7 @@ export async function DELETE(
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
+  const { createClient } = await import('@supabase/supabase-js');
   const supabase = createClient(
     process.env.SUPABASE_URL!,
     process.env.SUPABASE_SERVICE_ROLE_KEY!
