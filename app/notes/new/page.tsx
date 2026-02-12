@@ -1,7 +1,7 @@
 "use client";
 
 import NoteForm from "@/components/NoteForm";
-import { createNoteAction } from "./actions";
+import { createNoteAction } from "../actions";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 

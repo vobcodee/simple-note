@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter, useParams } from "next/navigation";
 import NoteForm from "@/components/NoteForm";
-import { getNoteAction, updateNoteAction } from "../actions";
+import { getNoteAction, updateNoteAction } from "../../actions";
 import { Note } from "@/schemas/note";
 import { toast } from "sonner";
 
