@@ -2,64 +2,24 @@
 
 console.log('[SERVER] actions.ts module loaded');
 
-import { cookies } from 'next/headers';
+import { headers } from 'next/headers';
 import { revalidatePath } from 'next/cache';
 import { NoteSchema, CreateNoteInput, UpdateNoteInput } from '@/schemas/note';
 
-// Helper to get current user from auth cookie
+// Helper to get current user from headers (set by middleware)
 async function getCurrentUser() {
   console.log('[DEBUG] getCurrentUser called');
   
-  const cookieStore = await cookies();
-  const allCookies = cookieStore.getAll();
+  const headersList = await headers();
+  const userId = headersList.get('x-user-id');
   
-  console.log('[DEBUG] Cookies:', allCookies.map(c => c.name));
+  console.log('[DEBUG] x-user-id from headers:', userId);
   
-  // Find the auth cookie
-  const authCookie = allCookies.find(c => 
-    c.name.startsWith('sb-') && c.name.endsWith('-auth-token')
-  );
-  
-  console.log('[DEBUG] Auth cookie:', authCookie?.name || 'not found');
-  
-  if (!authCookie?.value) {
+  if (!userId) {
     throw new Error('인증이 필요합니다.');
   }
-  
-  // Decode the cookie to get user ID
-  try {
-    // Supabase stores auth as base64 encoded JSON array
-    const decoded = Buffer.from(authCookie.value, 'base64').toString('utf-8');
-    const parsed = JSON.parse(decoded);
-    
-    console.log('[DEBUG] Parsed auth data:', { 
-      isArray: Array.isArray(parsed), 
-      length: parsed?.length 
-    });
-    
-    if (Array.isArray(parsed) && parsed.length >= 1) {
-      const accessToken = parsed[0];
-      
-      // Decode JWT payload
-      const base64Payload = accessToken.split('.')[1];
-      const padding = '='.repeat((4 - base64Payload.length % 4) % 4);
-      const payload = JSON.parse(Buffer.from(base64Payload + padding, 'base64').toString('utf-8'));
-      
-      const userId = payload.sub;
-      console.log('[DEBUG] User ID from token:', userId);
-      
-      if (!userId) {
-        throw new Error('인증이 필요합니다. (Invalid token)');
-      }
-      
-      return { id: userId };
-    }
-    
-    throw new Error('인증이 필요합니다. (Invalid cookie format)');
-  } catch (e) {
-    console.error('[DEBUG] Failed to parse auth:', e);
-    throw new Error('인증이 필요합니다.');
-  }
+
+  return { id: userId };
 }
 
 // Server-side Supabase client for DB operations
