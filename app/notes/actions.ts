@@ -2,24 +2,64 @@
 
 console.log('[SERVER] actions.ts module loaded');
 
-import { headers } from 'next/headers';
+import { cookies } from 'next/headers';
 import { revalidatePath } from 'next/cache';
 import { NoteSchema, CreateNoteInput, UpdateNoteInput } from '@/schemas/note';
 
-// Helper to get current user from headers (set by middleware)
+// Helper to get current user from auth cookie
 async function getCurrentUser() {
   console.log('[DEBUG] getCurrentUser called');
   
-  const headersList = await headers();
-  const userId = headersList.get('x-user-id');
+  const cookieStore = await cookies();
+  const allCookies = cookieStore.getAll();
   
-  console.log('[DEBUG] x-user-id from headers:', userId);
+  console.log('[DEBUG] Cookies:', allCookies.map(c => c.name));
   
-  if (!userId) {
+  // Find the auth cookie
+  const authCookie = allCookies.find(c => 
+    c.name.startsWith('sb-') && c.name.endsWith('-auth-token')
+  );
+  
+  console.log('[DEBUG] Auth cookie:', authCookie?.name || 'not found');
+  
+  if (!authCookie?.value) {
     throw new Error('인증이 필요합니다.');
   }
-
-  return { id: userId };
+  
+  // Decode the cookie to get user ID
+  try {
+    // Supabase stores auth as base64 encoded JSON array
+    const decoded = Buffer.from(authCookie.value, 'base64').toString('utf-8');
+    const parsed = JSON.parse(decoded);
+    
+    console.log('[DEBUG] Parsed auth data:', { 
+      isArray: Array.isArray(parsed), 
+      length: parsed?.length 
+    });
+    
+    if (Array.isArray(parsed) && parsed.length >= 1) {
+      const accessToken = parsed[0];
+      
+      // Decode JWT payload
+      const base64Payload = accessToken.split('.')[1];
+      const padding = '='.repeat((4 - base64Payload.length % 4) % 4);
+      const payload = JSON.parse(Buffer.from(base64Payload + padding, 'base64').toString('utf-8'));
+      
+      const userId = payload.sub;
+      console.log('[DEBUG] User ID from token:', userId);
+      
+      if (!userId) {
+        throw new Error('인증이 필요합니다. (Invalid token)');
+      }
+      
+      return { id: userId };
+    }
+    
+    throw new Error('인증이 필요합니다. (Invalid cookie format)');
+  } catch (e) {
+    console.error('[DEBUG] Failed to parse auth:', e);
+    throw new Error('인증이 필요합니다.');
+  }
 }
 
 // Server-side Supabase client for DB operations
@@ -48,7 +88,6 @@ export async function createNoteAction(input: CreateNoteInput) {
     
     const supabase = await getServiceClient();
     
-    // Validate input
     const validated = NoteSchema.omit({ id: true, created_at: true, updated_at: true, user_id: true }).parse(input);
     
     const { data, error } = await supabase
@@ -75,10 +114,9 @@ export async function createNoteAction(input: CreateNoteInput) {
 
 // READ (all notes for current user)
 export async function getNotesAction() {
-  console.log('[SERVER] getNotesAction called - ENTRY');
+  console.log('[SERVER] getNotesAction called');
   
   try {
-    console.log('[SERVER] Calling getCurrentUser...');
     const user = await getCurrentUser();
     console.log('[SERVER] User authenticated:', user.id);
     
@@ -142,7 +180,6 @@ export async function updateNoteAction(id: string, input: UpdateNoteInput) {
     
     const supabase = await getServiceClient();
     
-    // Validate input
     const validated = NoteSchema.omit({ id: true, created_at: true, updated_at: true, user_id: true }).parse(input);
     
     const { data, error } = await supabase
