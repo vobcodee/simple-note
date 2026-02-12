@@ -5,13 +5,21 @@ import { cookies } from 'next/headers';
 import { revalidatePath } from 'next/cache';
 import { NoteSchema, CreateNoteInput, UpdateNoteInput } from '@/schemas/note';
 
+// Simple test action
+export async function testAction() {
+  console.log('[SERVER] testAction called');
+  return { success: true, message: 'Server action is working' };
+}
+
 // Helper to get current user from session
 async function getCurrentUser() {
   console.log('[DEBUG] getCurrentUser called');
   
   try {
     const cookieStore = await cookies();
-    console.log('[DEBUG] Cookies available:', cookieStore.getAll().map(c => c.name));
+    const allCookies = cookieStore.getAll();
+    console.log('[DEBUG] Cookies count:', allCookies.length);
+    console.log('[DEBUG] Cookie names:', allCookies.map(c => c.name));
     
     const supabase = createServerClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -19,7 +27,7 @@ async function getCurrentUser() {
       {
         cookies: {
           getAll() {
-            return cookieStore.getAll();
+            return allCookies;
           },
           setAll(cookiesToSet) {
             cookiesToSet.forEach(({ name, value, options }) => {
@@ -31,6 +39,9 @@ async function getCurrentUser() {
     );
 
     console.log('[DEBUG] Supabase client created');
+    
+    const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+    console.log('[DEBUG] Session:', session?.user?.id || 'null', 'Error:', sessionError?.message || 'none');
     
     const { data: { user }, error } = await supabase.auth.getUser();
     
@@ -71,11 +82,11 @@ async function getServiceClient() {
 
 // CREATE
 export async function createNoteAction(input: CreateNoteInput) {
-  console.log('[DEBUG] createNoteAction called');
+  console.log('[SERVER] createNoteAction called');
   
   try {
     const user = await getCurrentUser();
-    console.log('[DEBUG] User authenticated:', user.id);
+    console.log('[SERVER] User authenticated:', user.id);
     
     const supabase = await getServiceClient();
     
@@ -92,14 +103,14 @@ export async function createNoteAction(input: CreateNoteInput) {
       .single();
 
     if (error) {
-      console.error('[DEBUG] DB error:', error);
+      console.error('[SERVER] DB error:', error);
       throw new Error(`노트 생성 실패: ${error.message}`);
     }
 
     revalidatePath('/notes');
     return { success: true, data };
   } catch (error) {
-    console.error('[DEBUG] createNoteAction error:', error);
+    console.error('[SERVER] createNoteAction error:', error);
     throw error;
   }
 }
