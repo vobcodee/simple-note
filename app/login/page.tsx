@@ -1,8 +1,8 @@
-'use client';
+"use client";
 
-import { useEffect, useState } from 'react';
-import { createClient } from '@supabase/supabase-js';
-import { toast } from 'sonner';
+import { useEffect, useState } from "react";
+import { createClient } from "@supabase/supabase-js";
+import { toast } from "sonner";
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -10,68 +10,9 @@ const supabase = createClient(
 );
 
 export default function LoginPage() {
-  const [email, setEmail] = useState('');
+  const [email, setEmail] = useState("");
   const [loading, setLoading] = useState(false);
   const [sent, setSent] = useState(false);
-  const [processingHash, setProcessingHash] = useState(true);
-
-  // Handle hash-based auth (for Magic Link)
-  useEffect(() => {
-    const handleHashAuth = async () => {
-      const hash = window.location.hash;
-      console.log('[LOGIN] Hash:', hash);
-
-      if (hash && hash.includes('access_token')) {
-        console.log('[LOGIN] Detected hash-based auth');
-        
-        try {
-          // Extract tokens from hash
-          const params = new URLSearchParams(hash.substring(1));
-          const accessToken = params.get('access_token');
-          const refreshToken = params.get('refresh_token');
-          const expiresIn = params.get('expires_in');
-
-          console.log('[LOGIN] Tokens:', { 
-            hasAccessToken: !!accessToken, 
-            hasRefreshToken: !!refreshToken 
-          });
-
-          if (accessToken) {
-            // Set the session
-            const { data, error } = await supabase.auth.setSession({
-              access_token: accessToken,
-              refresh_token: refreshToken || '',
-            });
-
-            if (error) {
-              console.error('[LOGIN] setSession error:', error);
-              toast.error('로그인 처리 중 오류: ' + error.message);
-              setProcessingHash(false);
-              return;
-            }
-
-            console.log('[LOGIN] Session set, user:', data.user?.email);
-            
-            // Clear hash from URL
-            window.history.replaceState({}, document.title, window.location.pathname);
-            
-            toast.success('로그인되었습니다!');
-            
-            // Redirect to notes
-            window.location.href = '/notes';
-            return;
-          }
-        } catch (e) {
-          console.error('[LOGIN] Hash processing error:', e);
-          toast.error('로그인 처리 중 오류가 발생했습니다.');
-        }
-      }
-
-      setProcessingHash(false);
-    };
-
-    handleHashAuth();
-  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -80,34 +21,26 @@ export default function LoginPage() {
     const { error } = await supabase.auth.signInWithOtp({
       email,
       options: {
-        emailRedirectTo: `${window.location.origin}/login`,
+        emailRedirectTo: `${window.location.origin}/auth/callback`,
       },
     });
 
     if (error) {
-      toast.error('로그인 링크 발송 실패: ' + error.message);
+      toast.error("로그인 링크 발송 실패: " + error.message);
     } else {
-      toast.success('이메일로 로그인 링크를 볃송했습니다!');
+      toast.success("이메일로 로그인 링크를 발송했습니다!");
       setSent(true);
     }
 
     setLoading(false);
   };
 
-  if (processingHash) {
-    return (
-      <main className="max-w-md mx-auto p-8 text-center">
-        <p className="text-neutral-600">로그인 처리 중...</p>
-      </main>
-    );
-  }
-
   if (sent) {
     return (
       <main className="max-w-md mx-auto p-8 text-center">
         <h2 className="text-2xl font-bold mb-4">📧 확인하세요!</h2>
         <p className="text-neutral-600">
-          <strong>{email}</strong>로 로그인 링크를 볃송했습니다.<br />
+          <strong>{email}</strong>로 로그인 링크를 발송했습니다.<br />
           이메일을 확인하고 링크를 클릭하면 로그인됩니다.
         </p>
         <p className="mt-4 text-sm text-neutral-400">
@@ -139,13 +72,13 @@ export default function LoginPage() {
             className="w-full border border-neutral-300 rounded-lg p-3 focus:outline-none focus:ring-2 focus:ring-black"
           />
         </div>
-        
+
         <button
           type="submit"
           disabled={loading || !email}
           className="w-full bg-black text-white rounded-lg p-3 hover:bg-neutral-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
         >
-          {loading ? '전송 중...' : '로그인 링크 받기'}
+          {loading ? "전송 중..." : "로그인 링크 받기"}
         </button>
       </form>
 
